@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 )
-const UserRoot = "C:/GoWork/src/UploadServer"
+const UserRoot = "/Users/you/Documents/GitHub/fileServer/uploadServer"
 func getFileSize(filename string) int64 {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
@@ -121,8 +121,6 @@ func GetProgress(c *gin.Context) {
 
 
 func UploadHandle(c *gin.Context) {
-
-
 	user := c.Query("user")
 	fileName := c.Query("file_name")
 	filePath := c.Query("file_path")

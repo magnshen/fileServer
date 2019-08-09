@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
-	"uploadClient/model"
+	"./model"
 )
 
-const localPath = "C:/GoWork/src/uploadClient"
+const localPath = "/Users/you/Documents/GitHub/fileServer/uploadClient"
 
 
 func main() {
 	user := "780001"
 	filePath := localPath+"/FF.mp4"
-	uploadPath := "/home/xiazai"
+	uploadPath := "/home"
 
 	uploadModel := model.UploadModel{}
 	err := uploadModel.Init(user,filePath,uploadPath)
