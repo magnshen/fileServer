@@ -1,7 +1,6 @@
 package model
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/json"
@@ -9,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -106,29 +104,9 @@ func (self *UploadModel) UploadStart()error{
 	q.Set("file_hash", self.fileHash)
 	u.RawQuery = q.Encode()
 	apizUrl := u.String()
-
-
-	header_buf := bytes.NewBufferString("")
-	header_buf_writer := multipart.NewWriter(header_buf)
-
-	_, err = header_buf_writer.CreateFormFile("file", self.uploadName)
-	if err != nil {
-		fmt.Println("error writing to buffer")
-		return err
-	}
-	boundary := header_buf_writer.Boundary()
-	close_buf := bytes.NewBufferString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
-	r, w := io.Pipe()
+ 	r,w := io.Pipe()
 	go writer.doWrite(w)
-	request_reader := io.MultiReader(header_buf, r, close_buf)
-	req, err := http.NewRequest("POST", apizUrl, request_reader)
-	if err != nil {
-		fmt.Println("NewRequest Error")
-		return err
-	}
-	req.Header.Add("Content-Type", "multipart/form-data; boundary="+boundary)
-	req.ContentLength =self.fileSize-self.progress + int64(header_buf.Len()) + int64(close_buf.Len())
-	resp,err := http.DefaultClient.Do(req)
+	resp, err := http.Post(apizUrl, "binary/octet-stream", r)
 	defer resp.Body.Close()
 	if err != nil {
 		fmt.Println("request an error")
@@ -143,8 +121,7 @@ func (self *UploadModel) UploadStart()error{
 	}
 	if resData.Code >= 0 {
 		self.progress = resData.Data.Progress
-		fmt.Println(resData.Data.Complete)
-		fmt.Println("success")
+		fmt.Printf("文件: %s\n上传了: %d字节\n是否完成: %t \n",resData.Data.FileName,resData.Data.Progress,resData.Data.Complete)
 	}else{
 		fmt.Println(resData.Description)
 	}

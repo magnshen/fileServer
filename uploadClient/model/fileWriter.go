@@ -1,10 +1,8 @@
 package model
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"time"
 )
 
 type Writer struct {
@@ -22,13 +20,12 @@ func (w *Writer)doWrite(writer *io.PipeWriter){
 			writer.Write(buf[0:n])
 		}
 		if m > 48<<20{
-			time.Sleep(16*time.Second)
+			//time.Sleep(16*time.Second)
 			writer.Write(nil)
 			break
 		}
 		m = m+ int64(n)
 		if err==io.EOF {//结束
-			fmt.Println()
 			break
 		}
 	}

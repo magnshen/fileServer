@@ -165,7 +165,6 @@ func UploadHandle(c *gin.Context) {
 		n,err := fileUpload.Read(buf)   //网络原因,每次读不一定是1024
 		if n>0{
 			fileTemp.Write(buf[0:n])
-			fmt.Print(string(buf[0:n]))
 		}
 		curSize = curSize + int64(n)
 		if err==io.EOF { //结束

@@ -27,7 +27,7 @@ func main() {
 		fmt.Println("get Progress failed")
 		return
 	}
-	fmt.Println(tempSize)
+	fmt.Printf("获取上传进度: %d\n",tempSize)
 	err = uploadModel.UploadStart()
 	if err != nil{
 		fmt.Println(err)
