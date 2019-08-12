@@ -8,8 +8,8 @@ import (
 
 func main() {
 	e := gin.Default()
-	//e.MaxMultipartMemory = 4<<20
-	e.POST("/fileServer/upload", controler.UploadHandle)
+	e.POST("/fileServer/uploadAppend", controler.AppendHandle)
+	e.POST("/fileServer/uploadNewFile", controler.UploadNewFile)
 	e.GET("/fileServer/getProgress", controler.GetProgress)
-	e.Run(":8899")
+	e.Run(":8848")
 }

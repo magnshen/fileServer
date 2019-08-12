@@ -14,7 +14,7 @@ import (
 	"path"
 	"strconv"
 )
-const TargetUrl = "http://localhost:8899/fileServer"
+const TargetUrl = "http://localhost:8848/fileServer"
 
 
 type UploadModel struct {
@@ -95,7 +95,7 @@ func (self *UploadModel) UploadStart()error{
 		return err
 	}
 	writer := Writer{fh,self.progress}
-	u, _ := url.Parse(TargetUrl+"/upload")
+	u, _ := url.Parse(TargetUrl+"/uploadNewFile")
 	q := u.Query()
 	q.Set("user", self.userId)
 	q.Set("file_name", self.uploadName)

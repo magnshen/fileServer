@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 )
-const UserRoot = "/Users/you/Documents/GitHub/fileServer/uploadServer"
+const UserDataPath = "/data/cloud/data/data"
+const TempDataPath = "/data/cloud/data/data/temp"
 func getFileSize(filename string) int64 {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
@@ -100,7 +101,7 @@ func GetProgress(c *gin.Context) {
 	fileName := c.Query("file_name")
 	filePath := c.Query("file_path")
 	fileHash := c.Query("file_hash")  //可以用uuid
-	fileTmp := UserRoot+"/tmp/"+user+"/"+fileHash
+	fileTmp := UserDataPath+"/tmp/"+user+"/"+fileHash
 	if fileHash == ""{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
 		return
@@ -110,7 +111,7 @@ func GetProgress(c *gin.Context) {
 	if isExists{
 		progress = getFileSize(fileTmp)
 	}
-	newFile,err := getFileNameFormRepeatNane(UserRoot+"/User/"+user+filePath+"/",fileName)
+	newFile,err := getFileNameFormRepeatNane(UserDataPath+"/User/"+user+filePath+"/",fileName)
 	if err != nil{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get new file name error"})
 		return
@@ -120,7 +121,7 @@ func GetProgress(c *gin.Context) {
 
 
 
-func UploadHandle(c *gin.Context) {
+func AppendHandle(c *gin.Context) {
 	user := c.Query("user")
 	fileName := c.Query("file_name")
 	filePath := c.Query("file_path")
@@ -135,8 +136,8 @@ func UploadHandle(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
 		return
 	}
-	fileTempPath := UserRoot+"/tmp/"+user+"/"+fileHash
-	err = createFilePath(UserRoot+"/tmp/"+user)
+	fileTempPath := TempDataPath+"/"+user+"/"+fileHash
+	err = createFilePath(TempDataPath+"/"+user)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp folder failed"})
@@ -153,12 +154,7 @@ func UploadHandle(c *gin.Context) {
 	//fileUpload, err := c.FormFile("file")
 	//fileUpload, header, err := c.Request.FormFile("file")   //读取header,可以从range 鉴定临时文件大小是否一致
 	fileUpload := c.Request.Body
-
 	defer fileUpload.Close()
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"read header adn body  failed"})
-		return
-	}
 
 	buf := make([]byte,1024)
 	for {
@@ -182,7 +178,75 @@ func UploadHandle(c *gin.Context) {
 		return
 	}
 
-	physicsPath := fmt.Sprintf("%s/User/%s%s/",UserRoot,user,filePath)
+	physicsPath := fmt.Sprintf("%s/User/%s%s/",UserDataPath,user,filePath)
+	err = createFilePath(physicsPath)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Create User Upload Path failed"})
+		return
+	}
+	newFileName,err := getFileNameFormRepeatNane(physicsPath,fileName)
+	os.Rename(fileTempPath, physicsPath+newFileName)
+	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":newFileName,"progress": curSize,"complete":true}})
+}
+
+func UploadNewFile(c *gin.Context) {
+	user := c.Query("user")
+	fileName := c.Query("file_name")
+	filePath := c.Query("file_path")
+	fileHash := c.Query("file_hash")  //可以用uuid
+	fileSizeStr := c.Query("file_size")
+	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
+	if err != nil ||fileSize <0{
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_size must be uint64"})
+		return
+	}
+	if fileHash == ""{
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
+		return
+	}
+	fileTempPath := TempDataPath+"/"+user+"/"+fileHash
+	err = createFilePath(TempDataPath+"/"+user)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp folder failed"})
+		return
+	}
+	fileTemp, err := os.OpenFile(fileTempPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	defer fileTemp.Close()
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp file failed"})
+		return
+	}
+	curSize := int64(0)
+	fileUpload := c.Request.Body
+
+	defer fileUpload.Close()
+
+	buf := make([]byte,1024)
+	for {
+		n,err := fileUpload.Read(buf)   //网络原因,每次读不一定是1024
+		if n>0{
+			fileTemp.Write(buf[0:n])
+		}
+		curSize = curSize + int64(n)
+		if err==io.EOF { //结束
+			fileTemp.Close()
+			fmt.Println("finish ?")
+			break
+		}
+	}
+	if curSize < fileSize{
+		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"incomplete","data":gin.H{"fileName":fileName,"progress": curSize,"complete":false}})
+		return
+	}
+	if curSize > fileSize{
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Temp file is bigger then file size"})
+		return
+	}
+
+	physicsPath := fmt.Sprintf("%s/User/%s%s/",UserDataPath,user,filePath)
 	err = createFilePath(physicsPath)
 	if err != nil {
 		fmt.Println(err)
@@ -195,11 +259,10 @@ func UploadHandle(c *gin.Context) {
 }
 
 func init(){
-	_dir := UserRoot+"/tmp"
-	exist := pathExists(_dir)
+	exist := pathExists(TempDataPath)
 	if !exist  {
 		// 创建文件夹
-		err := os.Mkdir(_dir, os.ModePerm)
+		err := os.Mkdir(TempDataPath, os.ModePerm)
 		if err != nil {
 			fmt.Printf("mkdir failed![%v]\n", err)
 			os.Exit(2)
