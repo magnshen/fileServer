@@ -142,7 +142,7 @@ func UploadHandle(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp folder failed"})
 		return
 	}
-	fileTemp, err := os.OpenFile(fileTempPath, os.O_CREATE, 0666)
+	fileTemp, err := os.OpenFile(fileTempPath, os.O_CREATE|os.O_RDWR, 0666)
 	defer fileTemp.Close()
 	if err != nil {
 		fmt.Println(err)
