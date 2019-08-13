@@ -37,7 +37,6 @@ func (self *UploadModel) Init(userId,filePath,uploadPath string)error{
 	if err != nil {
 		return err
 	}
-
 	self.userId = userId
 	self.filePath = filePath
 	self.fileSize = fileInfo.Size()
@@ -55,7 +54,6 @@ func (self *UploadModel) Init(userId,filePath,uploadPath string)error{
 }
 
 func (self *UploadModel) GetProgressFormServer()(int64,error){
-
 	u, _ := url.Parse(TargetUrl+"/getProgress")
 	q := u.Query()
 	q.Set("user", self.userId)
@@ -65,21 +63,23 @@ func (self *UploadModel) GetProgressFormServer()(int64,error){
 	q.Set("file_hash", self.fileHash)
 	u.RawQuery = q.Encode()
 	res, err := http.Get(u.String());
-
 	if err != nil {
-		// handle error
+		fmt.Println("GetProgress request error")
 		return 0,err
 	}
-
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
-
 	if err != nil {
-		fmt.Println("read response error")
+		fmt.Println("GetProgress read body error")
 		return 0,err
 	}
 	resData := &progressResponse{}
-	json.Unmarshal(body,resData)
+	err = json.Unmarshal(body,resData)
+	if err != nil {
+		fmt.Println("GetProgress json decode error")
+		fmt.Println(string(body))
+		return 0,err
+	}
 	if resData.Code >= 0 {
 		self.progress = resData.Data.Progress
 		return self.progress,nil
@@ -95,7 +95,7 @@ func (self *UploadModel) UploadStart()error{
 		return err
 	}
 	writer := Writer{fh,self.progress}
-	u, _ := url.Parse(TargetUrl+"/uploadNewFile")
+	u, _ := url.Parse(TargetUrl+"/uploadAppend")
 	q := u.Query()
 	q.Set("user", self.userId)
 	q.Set("file_name", self.uploadName)
@@ -109,14 +109,19 @@ func (self *UploadModel) UploadStart()error{
 	resp, err := http.Post(apizUrl, "binary/octet-stream", r)
 	defer resp.Body.Close()
 	if err != nil {
-		fmt.Println("request an error")
+		fmt.Println("UploadStart request error")
+		return err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("UploadStart Read Body error")
 		return err
 	}
 	resData := &progressResponse{}
-	dec := json.NewDecoder(resp.Body)
-	err = dec.Decode(resData)
+	err = json.Unmarshal(body, resData)
 	if err != nil {
-		fmt.Println("json decode error")
+		fmt.Println("UploadStart json decode error")
+		fmt.Println(string(body))
 		return err
 	}
 	if resData.Code >= 0 {
@@ -125,5 +130,29 @@ func (self *UploadModel) UploadStart()error{
 	}else{
 		fmt.Println(resData.Description)
 	}
+	return nil
+}
+
+func (self *UploadModel) UploadDelete()error{
+	resp, err := http.PostForm(TargetUrl+"/uploadDelete",url.Values{"user": {self.userId}, "file_hash": {self.fileHash}})
+
+	defer resp.Body.Close()
+	if err != nil {
+		fmt.Println("UploadDelete request error")
+		return err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("UploadDelete Read Body error")
+		return err
+	}
+	resData := &progressResponse{}
+	err = json.Unmarshal(body, resData)
+	if err != nil {
+		fmt.Println("UploadDelete json decode error")
+		fmt.Println(string(body))
+		return err
+	}
+	fmt.Println(resData.Description)
 	return nil
 }

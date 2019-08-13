@@ -10,8 +10,10 @@ import (
 	"strconv"
 	"strings"
 )
-const UserDataPath = "/data/cloud/data/data"
-const TempDataPath = "/data/cloud/data/data/temp"
+const UserDataPath = "/data/cloud/data/data/"
+const TempDataPath = "/data/cloud/data/data/temp/"
+
+
 func getFileSize(filename string) int64 {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
@@ -36,26 +38,16 @@ func createFilePath(path string)error{
 		return err
 	}
 	return nil
-
 }
 
-//func filePathToHash(path string) string{
-//	Sha1Inst:=sha1.New()
-//	Sha1Inst.Write([]byte(path))
-//	result := Sha1Inst.Sum([]byte(""))
-//	return base32.StdEncoding.EncodeToString(result)
-//}
-
-//func creatUploadCnf(cnfFile string ,fileSize int64) error{
-//	f, err := os.OpenFile(cnfFile, os.O_WRONLY|os.O_TRUNC, 0666)  //写入时会覆盖文件
-//	defer f.Close()
-//	if err != nil{
-//		return err
-//	}
-//	string := strconv.FormatInt(fileSize,10)
-//	_, err = f.WriteString(string)
-//	return err
-//}
+func uploadPathToLocalPath(user, uploadPath string)string{
+	if len(uploadPath) >= 9 {            //   "/*public*"的长度是9
+		if strings.Compare(uploadPath[0:9],"/*public*") == 0{
+			return fmt.Sprintf("%scommon/%s/",UserDataPath,uploadPath[9:])   //realPath为空时 //  双斜杠等效于 /
+		}
+	}
+	return fmt.Sprintf("%sUser/%s%s/",UserDataPath,user,uploadPath)
+}
 
 func getFileNameFormRepeatNane(filePath,fileName string)(string ,error){
 	i := 0
@@ -77,31 +69,13 @@ func getFileNameFormRepeatNane(filePath,fileName string)(string ,error){
 	return file ,nil
 }
 
-//func getFileSizeFromCnf(cnfFile string) (int64 ,error){
-//	fp, err := os.Open(cnfFile)
-//	if err != nil {
-//		return 0, err
-//	}
-//	defer fp.Close()
-//	buffer := make([]byte, 16)
-//
-//	_, err = fp.Read(buffer)
-//	if err != nil {
-//		return 0, err
-//	}
-//	fileSize, err := strconv.ParseInt(string(buffer), 10, 64)  //读出来转字符串再转int64
-//	if err != nil {
-//		return 0, err
-//	}
-//	return fileSize,nil
-//}
 
 func GetProgress(c *gin.Context) {
 	user := c.Query("user")
 	fileName := c.Query("file_name")
 	filePath := c.Query("file_path")
 	fileHash := c.Query("file_hash")  //可以用uuid
-	fileTmp := UserDataPath+"/tmp/"+user+"/"+fileHash
+	fileTmp := TempDataPath+user+"/"+fileHash
 	if fileHash == ""{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
 		return
@@ -111,14 +85,39 @@ func GetProgress(c *gin.Context) {
 	if isExists{
 		progress = getFileSize(fileTmp)
 	}
-	newFile,err := getFileNameFormRepeatNane(UserDataPath+"/User/"+user+filePath+"/",fileName)
+	localPath := uploadPathToLocalPath(user,filePath)
+	newFile,err := getFileNameFormRepeatNane(localPath,fileName)
 	if err != nil{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get new file name error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress,"fileName":newFile}})
 }
+func GetFile(c *gin.Context) {
+	fileName := c.Param("fileName")
+	user := c.Query("user")
+	filePath := c.Query("file_path")
 
+	localPath := uploadPathToLocalPath(user,filePath)
+	c.File(localPath+fileName)
+}
+func UploadDelete(c *gin.Context) {
+	user := c.PostForm("user")
+	fileHash := c.PostForm("file_hash")  //可以用uuid
+	fileTmp := TempDataPath+user+"/"+fileHash
+	if fileHash == ""{
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
+		return
+	}
+	isExists := pathExists(fileTmp)
+	if isExists{
+		err := os.Remove(fileTmp)
+		if err != nil{
+			c.JSON(http.StatusOK, gin.H{"code": -1,"description":"remove temp file failed"})
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success"})
+}
 
 
 func AppendHandle(c *gin.Context) {
@@ -136,8 +135,8 @@ func AppendHandle(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
 		return
 	}
-	fileTempPath := TempDataPath+"/"+user+"/"+fileHash
-	err = createFilePath(TempDataPath+"/"+user)
+	fileTempPath := TempDataPath+user+"/"+fileHash
+	err = createFilePath(TempDataPath+user)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp folder failed"})
@@ -156,7 +155,7 @@ func AppendHandle(c *gin.Context) {
 	fileUpload := c.Request.Body
 	defer fileUpload.Close()
 
-	buf := make([]byte,1024)
+	buf := make([]byte,2<<20)
 	for {
 		n,err := fileUpload.Read(buf)   //网络原因,每次读不一定是1024
 		if n>0{
@@ -177,16 +176,15 @@ func AppendHandle(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Temp file is bigger then file size"})
 		return
 	}
-
-	physicsPath := fmt.Sprintf("%s/User/%s%s/",UserDataPath,user,filePath)
-	err = createFilePath(physicsPath)
+	localPath := uploadPathToLocalPath(user,filePath)
+	err = createFilePath(localPath)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Create User Upload Path failed"})
 		return
 	}
-	newFileName,err := getFileNameFormRepeatNane(physicsPath,fileName)
-	os.Rename(fileTempPath, physicsPath+newFileName)
+	newFileName,err := getFileNameFormRepeatNane(localPath,fileName)
+	os.Rename(fileTempPath, localPath+newFileName)
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":newFileName,"progress": curSize,"complete":true}})
 }
 
@@ -205,8 +203,8 @@ func UploadNewFile(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
 		return
 	}
-	fileTempPath := TempDataPath+"/"+user+"/"+fileHash
-	err = createFilePath(TempDataPath+"/"+user)
+	fileTempPath := TempDataPath+user+"/"+fileHash
+	err = createFilePath(TempDataPath+user)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"creat tmp folder failed"})
@@ -245,16 +243,15 @@ func UploadNewFile(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Temp file is bigger then file size"})
 		return
 	}
-
-	physicsPath := fmt.Sprintf("%s/User/%s%s/",UserDataPath,user,filePath)
-	err = createFilePath(physicsPath)
+	localPath := uploadPathToLocalPath(user,filePath)
+	err = createFilePath(localPath)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Create User Upload Path failed"})
 		return
 	}
-	newFileName,err := getFileNameFormRepeatNane(physicsPath,fileName)
-	os.Rename(fileTempPath, physicsPath+newFileName)
+	newFileName,err := getFileNameFormRepeatNane(localPath,fileName)
+	os.Rename(fileTempPath, localPath+newFileName)
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":newFileName,"progress": curSize,"complete":true}})
 }
 

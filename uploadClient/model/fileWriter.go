@@ -11,7 +11,7 @@ type Writer struct {
 }
 //这是做实验
 func (w *Writer)doWrite(writer *io.PipeWriter){
-	buf:=make([]byte,1024)       //每次读取大小，设置太小会影响速度。太大也没用，瓶颈是网络，而且增加内存
+	buf:=make([]byte,2<<20)       //每次读取大小，设置太小会影响速度。太大也没用，瓶颈是网络，而且增加内存
 	w.fileHandler.Seek(w.startPoin,1)
 	m := int64(0)
 	for {
