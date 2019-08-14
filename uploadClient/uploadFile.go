@@ -10,7 +10,7 @@ const localPath = "/Users/you/Documents/GitHub/fileServer/uploadClient"
 
 func main() {
 	user := "780001"
-	filePath := localPath+"/FF.mp4"
+	filePath := localPath+"/123.txt"
 	uploadPath := "/home"
 
 	uploadModel := model.UploadModel{}

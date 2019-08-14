@@ -71,10 +71,10 @@ func getFileNameFormRepeatNane(filePath,fileName string)(string ,error){
 
 
 func GetProgress(c *gin.Context) {
-	user := c.Query("user")
+	user := c.Query("user_id")
 	fileName := c.Query("file_name")
-	filePath := c.Query("file_path")
-	fileHash := c.Query("file_hash")  //可以用uuid
+	filePath := c.Query("target_path")
+	fileHash := c.Query("task_hash")  //可以用uuid
 	fileTmp := TempDataPath+user+"/"+fileHash
 	if fileHash == ""{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
@@ -95,15 +95,15 @@ func GetProgress(c *gin.Context) {
 }
 func GetFile(c *gin.Context) {
 	fileName := c.Param("fileName")
-	user := c.Query("user")
-	filePath := c.Query("file_path")
+	user := c.Query("user_id")
+	filePath := c.Query("target_path")
 
 	localPath := uploadPathToLocalPath(user,filePath)
 	c.File(localPath+fileName)
 }
 func UploadDelete(c *gin.Context) {
-	user := c.PostForm("user")
-	fileHash := c.PostForm("file_hash")  //可以用uuid
+	user := c.PostForm("user_id")
+	fileHash := c.PostForm("task_hash")  //可以用uuid
 	fileTmp := TempDataPath+user+"/"+fileHash
 	if fileHash == ""{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_hash is null"})
@@ -121,10 +121,10 @@ func UploadDelete(c *gin.Context) {
 
 
 func AppendHandle(c *gin.Context) {
-	user := c.Query("user")
+	user := c.Query("user_id")
 	fileName := c.Query("file_name")
-	filePath := c.Query("file_path")
-	fileHash := c.Query("file_hash")  //可以用uuid
+	filePath := c.Query("target_path")
+	fileHash := c.Query("task_hash")  //可以用uuid
 	fileSizeStr := c.Query("file_size")
 	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil ||fileSize <0{
@@ -189,10 +189,10 @@ func AppendHandle(c *gin.Context) {
 }
 
 func UploadNewFile(c *gin.Context) {
-	user := c.Query("user")
+	user := c.Query("user_id")
 	fileName := c.Query("file_name")
-	filePath := c.Query("file_path")
-	fileHash := c.Query("file_hash")  //可以用uuid
+	filePath := c.Query("target_path")
+	fileHash := c.Query("task_hash")  //可以用uuid
 	fileSizeStr := c.Query("file_size")
 	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil ||fileSize <0{

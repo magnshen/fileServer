@@ -56,11 +56,11 @@ func (self *UploadModel) Init(userId,filePath,uploadPath string)error{
 func (self *UploadModel) GetProgressFormServer()(int64,error){
 	u, _ := url.Parse(TargetUrl+"/getProgress")
 	q := u.Query()
-	q.Set("user", self.userId)
+	q.Set("user_id", self.userId)
 	q.Set("file_name", self.uploadName)
-	q.Set("file_path", self.uploadPath)
+	q.Set("target_path", self.uploadPath)
 	q.Set("file_size", self.fileSizeStr)
-	q.Set("file_hash", self.fileHash)
+	q.Set("task_hash", self.fileHash)
 	u.RawQuery = q.Encode()
 	res, err := http.Get(u.String());
 	if err != nil {
@@ -97,11 +97,11 @@ func (self *UploadModel) UploadStart()error{
 	writer := Writer{fh,self.progress}
 	u, _ := url.Parse(TargetUrl+"/uploadAppend")
 	q := u.Query()
-	q.Set("user", self.userId)
+	q.Set("user_id", self.userId)
 	q.Set("file_name", self.uploadName)
-	q.Set("file_path", self.uploadPath)
+	q.Set("target_path", self.uploadPath)
 	q.Set("file_size", self.fileSizeStr)
-	q.Set("file_hash", self.fileHash)
+	q.Set("task_hash", self.fileHash)
 	u.RawQuery = q.Encode()
 	apizUrl := u.String()
  	r,w := io.Pipe()
@@ -134,7 +134,7 @@ func (self *UploadModel) UploadStart()error{
 }
 
 func (self *UploadModel) UploadDelete()error{
-	resp, err := http.PostForm(TargetUrl+"/uploadDelete",url.Values{"user": {self.userId}, "file_hash": {self.fileHash}})
+	resp, err := http.PostForm(TargetUrl+"/uploadDelete",url.Values{"user_id": {self.userId}, "task_hash": {self.fileHash}})
 
 	defer resp.Body.Close()
 	if err != nil {
