@@ -1,6 +1,7 @@
 package controler
 
 import (
+	"../arsHash"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -10,9 +11,15 @@ import (
 	"strconv"
 	"strings"
 )
-const UserDataPath = "/data/cloud/data/data/"
-const TempDataPath = "/data/cloud/data/data/temp/"
+//const UserDataPath = "/data/cloud/data/data/"
+//const TempDataPath = "/data/cloud/data/data/temp/"
+const UserDataPath  = "/Users/you/Documents/GitHub/fileServer/uploadServer/"
+const TempDataPath  = "/Users/you/Documents/GitHub/fileServer/uploadServer/temp/"
 
+
+func getFileInfo(filename string) (fileSize int64, fileHash string, err error){
+	return arsHash.FileHash(filename)
+}
 
 func getFileSize(filename string) int64 {
 	fileInfo, err := os.Stat(filename)
@@ -43,13 +50,20 @@ func createFilePath(path string)error{
 func uploadPathToLocalPath(user, uploadPath string)string{
 	if len(uploadPath) >= 9 {            //   "/*public*"的长度是9
 		if strings.Compare(uploadPath[0:9],"/*public*") == 0{
-			return fmt.Sprintf("%scommon/%s/",UserDataPath,uploadPath[9:])   //realPath为空时 //  双斜杠等效于 /
+			return fmt.Sprintf("%scommon%s/",UserDataPath,uploadPath[9:])   //realPath为空时 //  双斜杠等效于 /
 		}
-	}
-	return fmt.Sprintf("%sUser/%s%s/",UserDataPath,user,uploadPath)
-}
 
-func getFileNameFormRepeatNane(filePath,fileName string)(string ,error){
+	}
+	if len(uploadPath) >= 7 {            //   "/*home*"的长度是7
+		if strings.Compare(uploadPath[0:7],"/*home*") == 0{
+			return fmt.Sprintf("%sUser/%s/home%s/",UserDataPath,user,uploadPath[7:])   //realPath为空时 //  双斜杠等效于 /
+		}
+
+	}
+	return fmt.Sprintf("%sUser/%s/home/",UserDataPath,user)
+}
+//名称重复时，获取最新的名称
+func getFileNameFormRepeatName(filePath,fileName string)(bool,string ,error){
 	i := 0
 	var file string
 	fileSuffix := path.Ext(fileName)
@@ -66,7 +80,7 @@ func getFileNameFormRepeatNane(filePath,fileName string)(string ,error){
 		}
 		i++
 	}
-	return file ,nil
+	return i>0,file ,nil
 }
 
 
@@ -86,12 +100,21 @@ func GetProgress(c *gin.Context) {
 		progress = getFileSize(fileTmp)
 	}
 	localPath := uploadPathToLocalPath(user,filePath)
-	newFile,err := getFileNameFormRepeatNane(localPath,fileName)
+	isRepeat,newFile,err := getFileNameFormRepeatName(localPath,fileName)
 	if err != nil{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get new file name error"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress,"fileName":newFile}})
+	if isRepeat{
+		fileSize,fileHash ,err:= getFileInfo(localPath+fileName)
+		if err != nil{
+			c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get fileInfo error"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress,"fileInfo":gin.H{"newName":newFile,"fileSize": fileSize,"fileHash":fileHash}}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress}})
 }
 func GetFile(c *gin.Context) {
 	fileName := c.Param("fileName")
@@ -126,6 +149,7 @@ func AppendHandle(c *gin.Context) {
 	filePath := c.Query("target_path")
 	fileHash := c.Query("task_hash")  //可以用uuid
 	fileSizeStr := c.Query("file_size")
+	isCoverStr := c.Query("cover")
 	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil ||fileSize <0{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_size must be uint64"})
@@ -183,7 +207,17 @@ func AppendHandle(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Create User Upload Path failed"})
 		return
 	}
-	newFileName,err := getFileNameFormRepeatNane(localPath,fileName)
+	if strings.EqualFold(isCoverStr,"1"){
+		os.Rename(fileTempPath, localPath+fileName)
+		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":fileName,"progress": curSize,"complete":true}})
+		return
+	}
+	_,newFileName,err := getFileNameFormRepeatName(localPath,fileName)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Get RepeatName failed"})
+		return
+	}
 	os.Rename(fileTempPath, localPath+newFileName)
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":newFileName,"progress": curSize,"complete":true}})
 }
@@ -194,6 +228,7 @@ func UploadNewFile(c *gin.Context) {
 	filePath := c.Query("target_path")
 	fileHash := c.Query("task_hash")  //可以用uuid
 	fileSizeStr := c.Query("file_size")
+	isCoverStr := c.Query("cover")
 	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil ||fileSize <0{
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"file_size must be uint64"})
@@ -250,7 +285,17 @@ func UploadNewFile(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Create User Upload Path failed"})
 		return
 	}
-	newFileName,err := getFileNameFormRepeatNane(localPath,fileName)
+	if strings.EqualFold(isCoverStr,"1"){
+		os.Rename(fileTempPath, localPath+fileName)
+		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":fileName,"progress": curSize,"complete":true}})
+		return
+	}
+	_,newFileName,err := getFileNameFormRepeatName(localPath,fileName)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"Get RepeatName failed"})
+		return
+	}
 	os.Rename(fileTempPath, localPath+newFileName)
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"success","data":gin.H{"fileName":newFileName,"progress": curSize,"complete":true}})
 }

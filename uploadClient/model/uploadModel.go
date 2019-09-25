@@ -14,7 +14,7 @@ import (
 	"path"
 	"strconv"
 )
-const TargetUrl = "http://localhost:8848/fileServer"
+const TargetUrl = "http://127.0.0.1:8848/fileServer"
 
 
 type UploadModel struct {
@@ -22,6 +22,7 @@ type UploadModel struct {
 	filePath string   //文件路径，包含文件名
 	uploadPath string  //上传路径
 	uploadName string  //上传文件名
+	IsCover bool  //是否覆盖上传
 	fileSize int64  //文件总大小
 	fileSizeStr string  //文件总大小 字符串类型
 	fileHash string  //文件哈希，由上传路径 + 上传文件名 + 大小  计算得到
@@ -43,7 +44,7 @@ func (self *UploadModel) Init(userId,filePath,uploadPath string)error{
 	self.uploadPath = uploadPath
 	self.uploadName = path.Base(filePath)
 	self.progress = 0
-
+	self.IsCover = false
 	fileSizeStr := strconv.FormatInt(self.fileSize,10)
 	self.fileSizeStr = fileSizeStr
 	Sha1Inst := sha1.New()
@@ -53,7 +54,7 @@ func (self *UploadModel) Init(userId,filePath,uploadPath string)error{
 	return nil
 }
 
-func (self *UploadModel) GetProgressFormServer()(int64,error){
+func (self *UploadModel) GetProgressFromServer()(info *progressData,err error){
 	u, _ := url.Parse(TargetUrl+"/getProgress")
 	q := u.Query()
 	q.Set("user_id", self.userId)
@@ -65,27 +66,28 @@ func (self *UploadModel) GetProgressFormServer()(int64,error){
 	res, err := http.Get(u.String());
 	if err != nil {
 		fmt.Println("GetProgress request error")
-		return 0,err
+		return
 	}
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Println("GetProgress read body error")
-		return 0,err
+		return
 	}
 	resData := &progressResponse{}
 	err = json.Unmarshal(body,resData)
 	if err != nil {
 		fmt.Println("GetProgress json decode error")
 		fmt.Println(string(body))
-		return 0,err
+		return
 	}
 	if resData.Code >= 0 {
 		self.progress = resData.Data.Progress
-		return self.progress,nil
+		info = &resData.Data
 	}else{
-		return 0,errors.New(resData.Description)
+		err = errors.New(resData.Description)
 	}
+	return
 }
 
 func (self *UploadModel) UploadStart()error{
@@ -102,6 +104,9 @@ func (self *UploadModel) UploadStart()error{
 	q.Set("target_path", self.uploadPath)
 	q.Set("file_size", self.fileSizeStr)
 	q.Set("task_hash", self.fileHash)
+	if self.IsCover{   //不覆盖时，不传这个值就可以了
+		q.Set("cover", "1")
+	}
 	u.RawQuery = q.Encode()
 	apizUrl := u.String()
  	r,w := io.Pipe()
@@ -117,7 +122,7 @@ func (self *UploadModel) UploadStart()error{
 		fmt.Println("UploadStart Read Body error")
 		return err
 	}
-	resData := &progressResponse{}
+	resData := &uploadResponse{}
 	err = json.Unmarshal(body, resData)
 	if err != nil {
 		fmt.Println("UploadStart json decode error")
@@ -146,7 +151,7 @@ func (self *UploadModel) UploadDelete()error{
 		fmt.Println("UploadDelete Read Body error")
 		return err
 	}
-	resData := &progressResponse{}
+	resData := &uploadResponse{}
 	err = json.Unmarshal(body, resData)
 	if err != nil {
 		fmt.Println("UploadDelete json decode error")
