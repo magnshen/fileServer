@@ -131,7 +131,7 @@ func (self *UploadModel) UploadStart()error{
 	}
 	if resData.Code >= 0 {
 		self.progress = resData.Data.Progress
-		fmt.Printf("文件: %s\n上传了: %d字节\n是否完成: %t \n",resData.Data.FileName,resData.Data.Progress,resData.Data.Complete)
+		fmt.Printf("上传成功\n文件名: %s\n上传了: %d字节\n是否完成: %t \n",resData.Data.FileName,resData.Data.Progress,resData.Data.Complete)
 	}else{
 		fmt.Println(resData.Description)
 	}

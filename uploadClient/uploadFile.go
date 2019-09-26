@@ -10,8 +10,8 @@ const localPath = "/Users/you/Documents/GitHub/fileServer/uploadClient"
 
 func main() {
 	user := "780001"
-	filePath := localPath+"/SNH48-梦想岛.mp4"
-	//filePath := localPath+"/123.txt"
+	//filePath := localPath+"/SNH48-梦想岛.mp4"
+	filePath := localPath+"/123.txt"
 	uploadPath := "/*home*/下载"
 	uploadModel := model.UploadModel{}
 	err := uploadModel.Init(user,filePath,uploadPath)
@@ -19,7 +19,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	uploadModel.IsCover = true  //是否覆盖上传
+	uploadModel.IsCover = false  //是否覆盖上传
 	//fileHash := arsHash.FileHash(filePath)
 	//fmt.Println(fileHash)
 
@@ -30,11 +30,19 @@ func main() {
 		return
 	}
 	fmt.Printf("获取上传进度(缓存文件大小): %d\n",progressInfo.Progress)
-	if progressInfo.FileInfo.FileSize > 0{
-		fmt.Printf("目标路径有重名文件\n")
-		fmt.Printf("远端文件大小: %d\n",progressInfo.FileInfo.FileSize)
-		fmt.Printf("远端文件哈希: %s\n",progressInfo.FileInfo.FileHash)
-		fmt.Printf("新文件名称: %s\n",progressInfo.FileInfo.NewName)
+
+	if len(progressInfo.FileInfoList) > 0{
+		fmt.Printf("服务端新文件名: %s\n",progressInfo.NewName)
+		i := 0
+		for i < len(progressInfo.FileInfoList){
+			item := progressInfo.FileInfoList[i]
+			fmt.Printf("远端路径有重名文件\n")
+			fmt.Printf("文件大小: %d\n",item.FileSize)
+			fmt.Printf("文件哈希: %s\n",item.FileHash)
+			fmt.Printf("文件名称: %s\n",item.FileName)
+			i++
+		}
+
 	}
 	err = uploadModel.UploadStart()
 	//err = uploadModel.UploadDelete()

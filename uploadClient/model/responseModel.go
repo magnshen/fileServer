@@ -13,13 +13,14 @@ type uploadResponse struct {
 }
 
 type fileInfo struct {
-	NewName string `json:"newName"`
+	FileName string `json:"fileName"`
 	FileSize int64 `json:"fileSize"`
 	FileHash string `json:"fileHash"`
 }
 type progressData struct {
+	NewName string `json:"newName"`
 	Progress int64 `json:"progress"`
-	FileInfo fileInfo `json:"fileInfo"`
+	FileInfoList []fileInfo `json:"fileInfoList"`
 }
 type progressResponse struct {
 	Code int `json:"code"`

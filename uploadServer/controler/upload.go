@@ -16,6 +16,11 @@ import (
 const UserDataPath  = "/Users/you/Documents/GitHub/fileServer/uploadServer/"
 const TempDataPath  = "/Users/you/Documents/GitHub/fileServer/uploadServer/temp/"
 
+type fileInfo struct {
+	FileName string `json:"fileName"`
+	FileSize int64 `json:"fileSize"`
+	FileHash string `json:"fileHash"`
+}
 
 func getFileInfo(filename string) (fileSize int64, fileHash string, err error){
 	return arsHash.FileHash(filename)
@@ -84,6 +89,31 @@ func getFileNameFormRepeatName(filePath,fileName string)(bool,string ,error){
 }
 
 
+func getFileInfoListFormRepeatName(filePath,fileName string)([]fileInfo,string){
+	i := 0
+	var fileList []fileInfo
+	var file string
+	fileSuffix := path.Ext(fileName)
+	filenameOnly := strings.TrimSuffix(fileName, fileSuffix)
+	for{
+		if i ==0{
+			file = fileName
+		}else{
+			file = fmt.Sprintf("%s(%d)%s",filenameOnly,i,fileSuffix)
+		}
+
+		fileSize,fileHash,err := arsHash.FileHash(filePath+file)
+		if err != nil{
+			break
+		}
+		fileMode := fileInfo{file ,fileSize,fileHash}
+		fileList = append(fileList, fileMode)
+		i++
+	}
+	return fileList,file
+}
+
+
 func GetProgress(c *gin.Context) {
 	user := c.Query("user_id")
 	fileName := c.Query("file_name")
@@ -100,18 +130,14 @@ func GetProgress(c *gin.Context) {
 		progress = getFileSize(fileTmp)
 	}
 	localPath := uploadPathToLocalPath(user,filePath)
-	isRepeat,newFile,err := getFileNameFormRepeatName(localPath,fileName)
-	if err != nil{
-		c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get new file name error"})
-		return
-	}
-	if isRepeat{
-		fileSize,fileHash ,err:= getFileInfo(localPath+fileName)
-		if err != nil{
-			c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get fileInfo error"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress,"fileInfo":gin.H{"newName":newFile,"fileSize": fileSize,"fileHash":fileHash}}})
+	repeatFileList,newName := getFileInfoListFormRepeatName(localPath,fileName)
+	if len(repeatFileList) > 0{
+		//fileSize,fileHash ,err:= getFileInfo(localPath+fileName)
+		//if err != nil{
+		//	c.JSON(http.StatusOK, gin.H{"code": -1,"description":"get fileInfo error"})
+		//	return
+		//}
+		c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress,"newName": newName,"fileInfoList":repeatFileList}})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0,"description":"","data":gin.H{"progress": progress}})
